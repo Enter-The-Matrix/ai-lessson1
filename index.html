@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+  <body style="font-family: sans-serif; max-width: 700px; margin: 2rem auto">
+    <div id="out" style="white-space: pre-wrap; min-height: 300px"></div>
+    <form id="form">
+      <input id="q" autocomplete="off" style="width: 80%" /><button>
+        Send
+      </button>
+    </form>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const socket = io();
+      const out = document.getElementById("out");
+      const q = document.getElementById("q");
+
+      document.getElementById("form").onsubmit = (e) => {
+        e.preventDefault();
+        out.textContent += `\nyou> ${q.value}\nAI> `;
+        socket.emit("ask", q.value);
+        q.value = "";
+      };
+      socket.on("token", (text) => {
+        out.textContent += text;
+      });
+      socket.on("done", (info) => {
+        out.textContent += `\n(${info.tokens} tokens, ${info.ttft} ms to first token)\n`;
+      });
+    </script>
+  </body>
+</html>
