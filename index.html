@@ -1,30 +1,260 @@
 <!doctype html>
 <html>
-  <body style="font-family: sans-serif; max-width: 700px; margin: 2rem auto">
-    <div id="out" style="white-space: pre-wrap; min-height: 300px"></div>
+  <head>
+    <meta charset="utf-8" />
+    <!-- makes it usable on a phone instead of a zoomed-out desktop page -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Local AI Chat</title>
+    <style>
+      /* 100dvh (dynamic viewport height) = real visible height on mobile,
+         100vh is the fallback for older browsers */
+      body {
+        margin: 0;
+        font-family: sans-serif;
+        height: 100vh;
+        height: 100dvh;
+        display: flex;
+        flex-direction: column;
+      }
+      #out,
+      #form {
+        max-width: 800px;
+        width: 100%;
+        margin: 0 auto;
+        box-sizing: border-box;
+      }
+      #out {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem;
+      }
+      #form {
+        display: flex;
+        gap: 8px;
+        padding: 12px;
+        border-top: 1px solid #ddd;
+      }
+      #q {
+        flex: 1;
+        padding: 10px;
+        font-size: 16px;
+      }
+      button {
+        padding: 10px 16px;
+      }
+      button:disabled,
+      #q:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .msg {
+        white-space: pre-wrap;
+        margin: 10px 0;
+        padding: 8px 12px;
+        border-radius: 8px;
+      }
+      .you {
+        background: #e7f1fb;
+        color: #1d4f8a;
+      } /* blue: your messages */
+      .ai {
+        background: #e5f4e4;
+        color: #1f5f2a;
+      } /* green: AI replies */
+      .thinking {
+        background: #f0efec;
+        color: #777;
+        font-style: italic;
+        font-size: 13px;
+      } /* grey: model's reasoning */
+      .error {
+        background: #fbe9e9;
+        color: #8a1d1d;
+      } /* red: errors */
+      .system {
+        color: #888;
+        font-size: 13px;
+        text-align: center;
+        margin: 8px 0;
+      } /* connection notices */
+      .stats {
+        color: #888;
+        font-size: 12px;
+        margin: -4px 0 12px 12px;
+      } /* grey: token stats */
+      .label {
+        font-weight: bold;
+      }
+
+      /* "AI is typing" dots shown until the first token arrives (covers model load time) */
+      .waiting::after {
+        content: "…";
+        animation: blink 1s infinite;
+      }
+      @keyframes blink {
+        50% {
+          opacity: 0.2;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="out"></div>
     <form id="form">
-      <input id="q" autocomplete="off" style="width: 80%" /><button>
-        Send
-      </button>
+      <input id="q" autocomplete="off" placeholder="Ask something..." />
+      <button id="send">Send</button>
     </form>
+
+    <!-- Socket.IO serves this client script automatically from the Node server -->
     <script src="/socket.io/socket.io.js"></script>
     <script>
-      const socket = io();
+      const socket = io(); // connect to the same host/port that served this page
       const out = document.getElementById("out");
       const q = document.getElementById("q");
+      const sendBtn = document.getElementById("send");
 
+      let aiText = null; // element the current AI answer streams into
+      let thinkingText = null; // element the current reasoning streams into
+      let waitingEl = null; // the "AI…" placeholder shown before the first token
+
+      // Only auto-scroll if the user is already near the bottom.
+      // Before: every token yanked you to the bottom even while you scrolled up to read.
+      const nearBottom = () =>
+        out.scrollHeight - out.scrollTop - out.clientHeight < 80;
+      const scrollDown = (force = false) => {
+        if (force || nearBottom()) out.scrollTop = out.scrollHeight;
+      };
+
+      // Lock / unlock the input while the model is answering.
+      // The server rejects a second question anyway ("busy"), this just makes it obvious.
+      function setBusy(isBusy) {
+        q.disabled = isBusy;
+        sendBtn.disabled = isBusy;
+        sendBtn.textContent = isBusy ? "..." : "Send";
+        if (!isBusy) q.focus();
+      }
+
+      // Adds one coloured bubble and returns the element that holds its text.
+      // textContent (not innerHTML) = model output can never inject HTML/scripts.
+      function addMessage(kind, label, text) {
+        const div = document.createElement("div");
+        div.className = `msg ${kind}`;
+        const strong = document.createElement("span");
+        strong.className = "label";
+        strong.textContent = label + " ";
+        const body = document.createElement("span");
+        body.textContent = text;
+        div.append(strong, body);
+        out.append(div);
+        scrollDown(true);
+        return body;
+      }
+
+      // Small grey centred line for connection status etc.
+      function addNotice(text) {
+        const div = document.createElement("div");
+        div.className = "system";
+        div.textContent = text;
+        out.append(div);
+        scrollDown(true);
+      }
+
+      // Remove the "AI…" placeholder once real output (or an error) arrives
+      function clearWaiting() {
+        waitingEl?.parentElement.remove();
+        waitingEl = null;
+      }
+
+      // Everything that ends a turn (done / failed / busy / disconnect) goes through here
+      function finishTurn() {
+        clearWaiting();
+        aiText = null;
+        thinkingText = null;
+        setBusy(false);
+      }
+
+      // ---- SEND ---------------------------------------------------------------
       document.getElementById("form").onsubmit = (e) => {
         e.preventDefault();
-        out.textContent += `\nyou> ${q.value}\nAI> `;
-        socket.emit("ask", q.value);
+        const text = q.value.trim();
+        if (!text || q.disabled) return;
+        if (!socket.connected) {
+          addMessage("error", "Error:", "Not connected to the server.");
+          return;
+        }
+        addMessage("you", "You:", text);
+        thinkingText = null; // created only if the model sends thinking
+        aiText = null; // created when the first answer token arrives
+        // placeholder so the user sees something during model load / prompt processing
+        waitingEl = addMessage("ai waiting", "AI:", "");
+        setBusy(true);
+        socket.emit("ask", text);
         q.value = "";
       };
+
+      // ---- THINKING chunks (only when the server has think: true) -------------
+      socket.on("thinking", (text) => {
+        clearWaiting();
+        if (!thinkingText)
+          thinkingText = addMessage("thinking", "Thinking:", "");
+        thinkingText.textContent += text;
+        scrollDown();
+      });
+
+      // ---- ANSWER chunks ------------------------------------------------------
       socket.on("token", (text) => {
-        out.textContent += text;
+        clearWaiting();
+        if (!aiText) aiText = addMessage("ai", "AI:", "");
+        aiText.textContent += text;
+        scrollDown();
       });
+
+      // ---- FINAL stats --------------------------------------------------------
       socket.on("done", (info) => {
-        out.textContent += `\n(${info.tokens} tokens, ${info.ttft} ms to first token)\n`;
+        // model finished without writing any answer (e.g. used all num_predict on thinking)
+        if (!aiText)
+          addMessage("error", "AI:", "(no answer — hit the token limit?)");
+        const stats = document.createElement("div");
+        stats.className = "stats";
+        stats.textContent =
+          info.ttft == null
+            ? `${info.tokens} tokens`
+            : `${info.tokens} tokens · ${info.ttft} ms to first token`;
+        out.append(stats);
+        scrollDown();
+        finishTurn();
       });
+
+      // ---- ERROR from the server (Ollama down, model missing, ...) ------------
+      socket.on("failed", (msg) => {
+        addMessage("error", "Error:", msg);
+        finishTurn(); // unlock input — before this fix the UI stayed stuck
+      });
+
+      // ---- Server says a previous answer is still running ---------------------
+      socket.on("busy", (msg) => {
+        clearWaiting();
+        addMessage("error", "Wait:", msg);
+        // don't unlock: the earlier answer is still streaming and will finish the turn
+      });
+
+      // ---- CONNECTION status --------------------------------------------------
+      // Server restart / network drop. The server keeps history PER CONNECTION,
+      // so after reconnecting the AI has forgotten this conversation — say so.
+      let wasConnected = false;
+      socket.on("connect", () => {
+        if (wasConnected) addNotice("Reconnected — the AI's memory was reset.");
+        wasConnected = true;
+        setBusy(false);
+      });
+      socket.on("disconnect", () => {
+        addNotice("Disconnected from server, retrying…");
+        finishTurn();
+        setBusy(true); // can't send while offline
+      });
+
+      q.focus();
     </script>
   </body>
 </html>

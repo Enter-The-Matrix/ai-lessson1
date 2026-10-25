@@ -21,11 +21,8 @@ while (true) {
     model: "qwen3.5:9b",
     messages: history,
     think: false,
-    options: {
-      temperature: 0.7,
-      num_predict: 2000,
-    },
     stream: true,
+    options: { temperature: 0.7, num_predict: 2000 },
   });
 
   // TODO 3: create an empty string, e.g. let fullReply = ""
