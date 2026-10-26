@@ -5,7 +5,7 @@ const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
-
+            
 const colors = {
   reset: "\x1b[0m",
   cyan: "\x1b[36m",

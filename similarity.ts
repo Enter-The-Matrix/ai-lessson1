@@ -1,6 +1,7 @@
 // this function calculates the cosine similarity between two vectors.
 // About 1 = same meaning, 0.5-0.7 related, about 0 = unrelated.
-export function cosineSimilarity(a: number[], b: number[]): number {
+
+  export function cosineSimilarity(a: number[], b: number[]): number {
   let together = 0; // how much the two arrows point the same way
   let sizeA = 0;    // how long arrow a is
   let sizeB = 0;    // how long arrow b is
