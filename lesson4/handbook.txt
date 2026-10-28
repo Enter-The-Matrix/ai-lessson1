@@ -1,0 +1,37 @@
+NORTHWIND LABS EMPLOYEE HANDBOOK (fictional, for practice)
+
+1. Working hours
+Our core working hours are 10:00 to 16:00, Monday to Friday. Outside core hours you can choose when to start and finish, as long as you work 40 hours per week. Team meetings are only scheduled inside core hours. Overtime must be approved in advance by your manager and is paid at 1.5 times your normal hourly rate.
+
+2. Remote work
+Employees may work from home up to three days per week. Fridays are remote for everyone. If you want to work from another country for more than two weeks, you need written approval from HR at least one month before you travel, because of tax and insurance rules.
+
+3. Annual leave
+Full-time employees receive 24 days of paid annual leave per year, plus public holidays. Leave is earned at 2 days per month. You can carry over a maximum of 5 unused days into the next year; any other unused days expire on 31 March. Leave requests of more than 5 consecutive days must be submitted at least three weeks in advance.
+
+4. Sick leave
+If you are ill, tell your manager before 10:00 on the first day. You can take up to 3 days of sick leave without a doctor's note. From the fourth day onwards, a medical certificate is required. Sick days do not reduce your annual leave balance.
+
+5. Parental leave
+Birth parents receive 16 weeks of fully paid parental leave. Non-birth parents, including adoptive parents, receive 8 weeks of fully paid leave, which can be taken any time within the first year. Please inform HR at least two months before your planned leave starts.
+
+6. Equipment and laptops
+Every employee receives a company laptop on their first day. Laptops are replaced every three years. You may install software needed for your work, but games and personal cloud storage apps are not allowed. Lost or stolen equipment must be reported to IT within 24 hours. When your employment ends, all equipment must be returned on your last working day.
+
+7. Expenses
+Work-related expenses are reimbursed within 30 days of submitting a receipt through the expenses portal. Meals during business travel are covered up to 40 euros per day. Taxis are allowed when public transport is not available or after 22:00. First-class train and business-class flight tickets are not reimbursed.
+
+8. Learning budget
+Each employee has a learning budget of 1,000 euros per year for courses, books, and conferences. Unused budget does not roll over. Conference attendance also includes up to 3 paid days off per year for the event itself.
+
+9. Probation period
+New employees have a probation period of 3 months. During probation, either side can end the employment with one week of notice. After probation, the standard notice periods in section 10 apply.
+
+10. Resignation and notice period
+Employees who want to resign must give 60 days of written notice to their manager and HR. During the notice period you are expected to hand over your work and document any ongoing projects. Unused annual leave can either be taken during the notice period or paid out in your final salary, if your manager agrees.
+
+11. Security and passwords
+Use a password manager for all work accounts. Passwords must be at least 14 characters long, and two-factor authentication is required for email and code repositories. Never share your password, even with IT staff. If you think your account has been compromised, contact the security team immediately at the internal security channel.
+
+12. Code of conduct
+We expect everyone to treat colleagues, customers, and partners with respect. Harassment and discrimination of any kind are not tolerated. Concerns can be reported to HR or anonymously through the ethics hotline. Reports are investigated within 10 working days.

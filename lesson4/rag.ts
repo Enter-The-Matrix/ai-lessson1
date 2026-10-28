@@ -2,7 +2,7 @@ import ollama from "ollama";
 import { readFileSync } from "node:fs";
 import * as readline from "node:readline/promises";
 import { cosineSimilarity } from "./similarity.ts";
-
+import { chunk } from "./chunk.ts";
 const MIN_SCORE = 0.55; // your cut-off from Lesson 3
 const NOT_FOUND = "I don't know based on the handbook.";
 
@@ -15,15 +15,15 @@ Rules:
 - Keep the answer short.`;
 
 // ---------- Lesson 3: search (given in chunks) ----------
-function chunk(text: string, size = 500, overlap = 100): string[] {
-  const chunks: string[] = [];
-  const step = size - overlap;
-  for (let start = 0; start < text.length; start += step) {
-    chunks.push(text.slice(start, start + size));
-    if (start + size >= text.length) break;
-  }
-  return chunks;
-}
+// function chunk(text: string, size = 500, overlap = 100): string[] {
+//   const chunks: string[] = [];
+//   const step = size - overlap;
+//   for (let start = 0; start < text.length; start += step) {
+//     chunks.push(text.slice(start, start + size));
+//     if (start + size >= text.length) break;
+//   }
+//   return chunks;
+// }
 
 const chunks = chunk(readFileSync("./handbook.txt", "utf8"));
 
