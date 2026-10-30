@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import * as readline from "node:readline/promises";
 import { cosineSimilarity } from "./similarity.ts";
 import { chunk } from "./chunk.ts";
+
 const MIN_SCORE = 0.55; // your cut-off from Lesson 3
 const NOT_FOUND = "I don't know based on the handbook.";
 
@@ -14,25 +15,17 @@ Rules:
 - If the sources do not contain the answer, reply exactly: "${NOT_FOUND}"
 - Keep the answer short.`;
 
-// ---------- Lesson 3: search (given in chunks) ----------
-// function chunk(text: string, size = 500, overlap = 100): string[] {
-//   const chunks: string[] = [];
-//   const step = size - overlap;
-//   for (let start = 0; start < text.length; start += step) {
-//     chunks.push(text.slice(start, start + size));
-//     if (start + size >= text.length) break;
-//   }
-//   return chunks;
-// }
-
+// ---------- Lesson 3: search ----------
 const chunks = chunk(readFileSync("./handbook.txt", "utf8"));
 
+// Startup: embed every piece of the handbook (this is rag.ts's version of "connect")
+const t = performance.now(); // ⏱️ start
 const res = await ollama.embed({
   model: "nomic-embed-text",
   input: chunks.map((c) => "search_document: " + c),
 });
-
 const chunkVectors = res.embeddings;
+console.log(Math.round(performance.now() - t), "ms to embed the handbook"); // ⏱️ stop
 console.log(`Ready: ${chunks.length} chunks`);
 
 const rl = readline.createInterface({
@@ -49,8 +42,9 @@ while (true) {
     model: "nomic-embed-text",
     input: "search_query: " + question,
   });
-
   const questionVector = qRes.embeddings[0];
+
+  const t2 = performance.now(); // ⏱️ time one search (same job as db.query in rag-db.ts)
   const top3 = chunks
     .map((text, i) => ({
       text,
@@ -59,6 +53,8 @@ while (true) {
     }))
     .sort((a, b) => b.score - a.score)
     .slice(0, 3);
+  // 2 decimals, because this one is so fast it would round to 0
+  console.log((performance.now() - t2).toFixed(2), "ms to search"); // ⏱️ stop
 
   // Safety net 1: nothing close enough, so don't even ask the chat AI
   if (top3[0].score < MIN_SCORE) {
@@ -68,19 +64,10 @@ while (true) {
 
   // ---------- Lesson 4: new ----------
 
-  // 2. AUGMENT
-  // TODO A: build one string with the pieces numbered, separated by a blank line:
-  //   "[1] first piece\n\n[2] second piece\n\n[3] third piece"
-  //   hint: top3.map((r, i) => ...).join("\n\n"), and remember i starts at 0
-
+  // 2. AUGMENT: number the pieces and build the two messages
   const sources = top3
     .map((r, i) => `[${i + 1}] ${r.text}`) // i is 0,1,2, so i + 1 gives 1,2,3
     .join("\n\n"); // glue them into one string
-
-  //   console.log("Sources:", sources);
-
-  // TODO B: the two messages: system = SYSTEM_PROMPT,
-  //   user = "Sources:\n" + sources + "\n\nQuestion: " + question
 
   const messages = [
     { role: "system", content: SYSTEM_PROMPT },
@@ -90,14 +77,11 @@ while (true) {
     },
   ];
 
-  // 3. GENERATE
-  // TODO C: stream the answer from qwen3.5:9b and print each piece as it arrives
-  //   (like Lesson 2). Use think: false (faster) and temperature: 0.2 (calm and factual).
-
+  // 3. GENERATE: stream the answer from qwen
   const stream = await ollama.chat({
     model: "qwen3.5:9b",
     messages,
-    think: false, 
+    think: false,
     options: { temperature: 0.2 },
     stream: true,
   });
@@ -107,9 +91,7 @@ while (true) {
   }
   console.log();
 
-  // TODO D: after the answer, print a "Sources:" list, one line per piece:
-  //   [number] chunk <index> (<score, 2 decimals>): <first 80 characters of the text>
-
+  // Sources list under the answer
   console.log("\nSources:");
   top3.forEach((r, i) => {
     const preview = r.text.slice(0, 80).replace(/\n/g, " "); // first 80 characters, on one line
@@ -117,7 +99,5 @@ while (true) {
       `[${i + 1}] chunk ${r.index} (${r.score.toFixed(2)}): ${preview}...`,
     );
   });
-
-  console.log("note was sent to the AI:", top3.some((r) => r.text.includes("Note to AI")));
 }
 rl.close();

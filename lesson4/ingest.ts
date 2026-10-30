@@ -1,3 +1,6 @@
+// this file cut a document into pieces, get an address (embedding) for each piece,
+// and save the words + address in Postgres so we can search it later without redoing anything.
+
 import ollama from "ollama";
 import pg from "pg";
 import { readFileSync } from "node:fs";
@@ -14,27 +17,47 @@ await db.connect();
 
 // Setup (given): turn on pgvector and create the table, only if they don't exist yet
 await db.query("CREATE EXTENSION IF NOT EXISTS vector");
+
 await db.query(`
   CREATE TABLE IF NOT EXISTS chunks (
-    id          SERIAL PRIMARY KEY,   -- a unique number for every row, made automatically
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- a random, unguessable ID for every row, made automatically
     source      TEXT NOT NULL,        -- which file the piece came from
     chunk_index INT NOT NULL,         -- the piece's number inside that file
     content     TEXT NOT NULL,        -- the piece's words
     embedding   VECTOR(768) NOT NULL  -- its address (768 numbers)
   )`);
 
-const source = "handbook.txt";
+// const source = "handbook.txt";
+const source = "faq.txt";
+
 const pieces = chunk(readFileSync("./" + source, "utf8"));
 
 // TODO 1: get the addresses for all pieces in one request
 //   (exactly like Lesson 3 TODO 2, with the "search_document: " label). Call the result `vectors`.
 
+const res = await ollama.embed({
+  model: "nomic-embed-text",
+  input: pieces.map((c) => "search_document: " + c),
+});
+
+const vectors = res.embeddings;
+
 // TODO 2: delete this file's old rows first, so running ingest twice doesn't save everything twice
 //   SQL: DELETE FROM chunks WHERE source = $1      values: [source]
+
+await db.query("DELETE FROM chunks WHERE source = $1", [source]);
 
 // TODO 3: save every piece with its address, one row each (a for loop over pieces)
 //   SQL: INSERT INTO chunks (source, chunk_index, content, embedding) VALUES ($1, $2, $3, $4)
 //   values: [source, i, pieces[i], JSON.stringify(vectors[i])]
+//   (no id here: Postgres makes the UUID by itself)
+
+for (let i = 0; i < pieces.length; i++) {
+  await db.query(
+    "INSERT INTO chunks (source, chunk_index, content, embedding) VALUES ($1, $2, $3, $4)",
+    [source, i, pieces[i], JSON.stringify(vectors[i])],
+  );
+}
 
 console.log(`Saved ${pieces.length} pieces from ${source}`);
 await db.end();
